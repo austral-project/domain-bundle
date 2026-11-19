@@ -1,0 +1,10 @@
+services:
+  _defaults:
+    autowire:     true
+    public:       false
+
+##### Command to generate Url Parameters
+  austral.http.domain_attachement_migrater.command:
+    class:        Austral\DomainBundle\Command\DomainAttachementMigrateCommand
+    tags:
+      - { name: console.command, command: "austral:domain:migrate" }

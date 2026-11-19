@@ -1,10 +1,10 @@
 # Austral Domain Bundle
 
-[![Latest Stable Version](https://img.shields.io/packagist/v/austral/domain-bundle.svg?style=flat-square)](https://packagist.org/packages/austral/domain-bundle)
-[![CI](https://github.com/austral-project/domain-bundle/actions/workflows/ci.yml/badge.svg?branch=4.x)](https://github.com/austral-project/domain-bundle/actions/workflows/ci.yml?query=branch%3A4.x)
-[![PHP](https://img.shields.io/packagist/php-v/austral/domain-bundle.svg?style=flat-square)](https://packagist.org/packages/austral/domain-bundle)
-[![Symfony](https://img.shields.io/badge/Symfony-7.4-black?logo=symfony&style=flat-square)](https://symfony.com/releases/7.4)
-[![License](https://img.shields.io/github/license/austral-project/domain-bundle.svg?style=flat-square)](https://github.com/austral-project/domain-bundle/blob/4.x/LICENSE)
+[![Version](https://img.shields.io/packagist/v/austral/domain-bundle?label=version)](https://packagist.org/packages/austral/domain-bundle)
+[![CI](https://github.com/austral-project/domain-bundle/actions/workflows/ci.yml/badge.svg?branch=4.x)](https://github.com/austral-project/domain-bundle/actions/workflows/ci.yml)
+[![PHP](https://img.shields.io/packagist/dependency-v/austral/domain-bundle/php?version=4.x-dev)](https://packagist.org/packages/austral/domain-bundle)
+[![Symfony](https://img.shields.io/badge/symfony-7.4-black)](https://symfony.com/releases/7.4)
+[![License](https://img.shields.io/github/license/austral-project/domain-bundle)](LICENSE)
 
 Domain management and request context initialization for multi-domain Austral applications.
 
@@ -55,7 +55,7 @@ The administration screens and dashboard integration are provided through the bu
 
 ## Credits
 
-Austral Domain Bundle is part of the [Austral framework](https://austral.dev/), maintained by [Austral](https://github.com/austral-project).
+Created by [Matthieu Beurel](https://www.mbeurel.com). Sponsored by [Yipikai Studio](https://yipikai.studio).
 
 ## License
 

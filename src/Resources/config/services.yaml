@@ -1,0 +1,47 @@
+parameters:
+
+services:
+  _defaults:
+    autowire:      true
+    autoconfigure: true
+    public:        true
+
+
+##### Http Listener Kernel
+
+  Austral\DomainBundle\Listener\DoctrineListener: "@austral.http.doctrine.listener"
+  austral.http.doctrine.listener:
+    class:        Austral\DomainBundle\Listener\DoctrineListener
+    arguments:    [ "@austral.http.domains.management" ]
+    tags:
+      - { name: doctrine.event_subscriber, connection: default }
+
+  Austral\DomainBundle\Listener\EntityMappingListener:  "@austral.http.entity_mapping.listener"
+  austral.http.entity_mapping.listener:
+    class:        Austral\DomainBundle\Listener\EntityMappingListener
+    tags:
+      - { name: kernel.event_listener, event: "austral.event.entity.initialise.mapping", method: mapping }
+
+  ##### Entity Manager Listener
+  Austral\DomainBundle\Listener\EntityManagerListener:  "@austral.http.entity_manager.listener"
+  austral.http.entity_manager.listener:
+    class:          Austral\DomainBundle\Listener\EntityManagerListener
+    arguments:      ["@austral.entity.mapping", "@austral.http.domains.management", "@austral.http.request"]
+    tags:
+      - { name: kernel.event_listener, event: "austral.entity_manager.duplicate", method: duplicate }
+
+##### Http Services
+  Austral\DomainBundle\Services\DomainsManagement: "@austral.http.domains.management"
+  austral.http.domains.management:
+    class:          Austral\DomainBundle\Services\DomainsManagement
+    arguments:
+      - "@austral.entity.mapping"
+      - "@austral.entity_manager.domain"
+      - "@austral.http.request"
+      - "@austral.tools.debug"
+
+##### Domain Entity Manager
+  Austral\DomainBundle\EntityManager\DomainEntityManager: "@austral.entity_manager.domain"
+  austral.entity_manager.domain:
+    class:          Austral\DomainBundle\EntityManager\DomainEntityManager
+    arguments:      [ "@doctrine.orm.entity_manager",  "@event_dispatcher", "%austral.entity.domain.class%" ]

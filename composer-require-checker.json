@@ -1,0 +1,36 @@
+{
+  "symbol-whitelist": [
+    "App\\Entity\\Austral\\DomainBundle\\Domain",
+    "Austral\\HttpBundle\\Services\\HttpRequest",
+    "Austral\\AdminBundle\\Admin\\Admin",
+    "Austral\\AdminBundle\\Admin\\AdminModuleInterface",
+    "Austral\\AdminBundle\\Admin\\Event\\FormAdminEvent",
+    "Austral\\AdminBundle\\Admin\\Event\\ListAdminEvent",
+    "Austral\\AdminBundle\\Dashboard\\Values\\Tile",
+    "Austral\\AdminBundle\\Event\\DashboardEvent",
+    "Austral\\FormBundle\\Field\\ChoiceField",
+    "Austral\\FormBundle\\Field\\EntityField",
+    "Austral\\FormBundle\\Field\\SelectField",
+    "Austral\\FormBundle\\Field\\SwitchField",
+    "Austral\\FormBundle\\Field\\TextField",
+    "Austral\\FormBundle\\Field\\UploadField",
+    "Austral\\FormBundle\\Mapper\\Fieldset",
+    "Austral\\FormBundle\\Mapper\\GroupFields",
+    "Austral\\ListBundle\\Column\\Date",
+    "Austral\\ListBundle\\Column\\SwitchValue",
+    "Austral\\ListBundle\\Column\\Value"
+  ],
+  "php-core-extensions": [
+    "Core",
+    "date",
+    "json",
+    "hash",
+    "pcre",
+    "Phar",
+    "Reflection",
+    "SPL",
+    "random",
+    "standard"
+  ],
+  "scan-files": []
+}

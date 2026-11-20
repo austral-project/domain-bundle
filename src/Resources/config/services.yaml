@@ -9,30 +9,30 @@ services:
 
 ##### Http Listener Kernel
 
-  Austral\DomainBundle\Listener\DoctrineListener: "@austral.http.doctrine.listener"
-  austral.http.doctrine.listener:
+  Austral\DomainBundle\Listener\DoctrineListener: "@austral.domain.doctrine.listener"
+  austral.domain.doctrine.listener:
     class:        Austral\DomainBundle\Listener\DoctrineListener
-    arguments:    [ "@austral.http.domains.management" ]
+    arguments:    [ "@austral.domain.domains.management" ]
     tags:
       - { name: doctrine.event_subscriber, connection: default }
 
-  Austral\DomainBundle\Listener\EntityMappingListener:  "@austral.http.entity_mapping.listener"
-  austral.http.entity_mapping.listener:
+  Austral\DomainBundle\Listener\EntityMappingListener:  "@austral.domain.entity_mapping.listener"
+  austral.domain.entity_mapping.listener:
     class:        Austral\DomainBundle\Listener\EntityMappingListener
     tags:
       - { name: kernel.event_listener, event: "austral.event.entity.initialise.mapping", method: mapping }
 
   ##### Entity Manager Listener
-  Austral\DomainBundle\Listener\EntityManagerListener:  "@austral.http.entity_manager.listener"
-  austral.http.entity_manager.listener:
+  Austral\DomainBundle\Listener\EntityManagerListener:  "@austral.domain.entity_manager.listener"
+  austral.domain.entity_manager.listener:
     class:          Austral\DomainBundle\Listener\EntityManagerListener
-    arguments:      ["@austral.entity.mapping", "@austral.http.domains.management", "@austral.http.request"]
+    arguments:      ["@austral.entity.mapping", "@austral.domain.domains.management", "@austral.http.request"]
     tags:
       - { name: kernel.event_listener, event: "austral.entity_manager.duplicate", method: duplicate }
 
 ##### Http Services
   Austral\DomainBundle\Services\DomainsManagement: "@austral.http.domains.management"
-  austral.http.domains.management:
+  austral.domain.domains.management:
     class:          Austral\DomainBundle\Services\DomainsManagement
     arguments:
       - "@austral.entity.mapping"

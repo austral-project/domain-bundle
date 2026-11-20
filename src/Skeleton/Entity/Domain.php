@@ -8,7 +8,7 @@
  * file that was distributed with this source code.
  */
 
-namespace App\Entity\Austral\HttpBundle;
+namespace App\Entity\Austral\DomainBundle;
 use Austral\DomainBundle\Entity\Domain as BaseDomain;
 
 use Doctrine\ORM\Mapping as ORM;

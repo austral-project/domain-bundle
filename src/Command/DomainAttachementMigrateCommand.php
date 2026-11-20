@@ -73,14 +73,16 @@ class DomainAttachementMigrateCommand extends Command
    * @param Mapping<T>           $mapping
    * @param DomainsManagement<T> $domainsManagement
    * @param string|null          $name
+   * @param callable|null        $code
    */
   public function __construct(
     #[Autowire(service: 'austral.entity_manager')] protected EntityManager $entityManager,
     #[Autowire(service: 'austral.entity.mapping')] protected Mapping $mapping,
     #[Autowire(service: 'austral.http.domains.management')] protected DomainsManagement $domainsManagement,
-    ?string $name = null
+    ?string $name = null,
+    ?callable $code = null
   ) {
-    parent::__construct($name);
+    parent::__construct($name, $code);
   }
 
   /**

@@ -21,7 +21,6 @@ use Austral\EntityBundle\Mapping\Mapping;
 use Austral\HttpBundle\Services\HttpRequest;
 use Austral\ToolsBundle\AustralTools;
 use Austral\ToolsBundle\Services\Debug;
-use Doctrine\ORM\Query\QueryException;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Routing\RequestContext;
 
@@ -132,8 +131,6 @@ class DomainsManagement
    * @param bool $detectAutoHost
    *
    * @return $this
-   *
-   * @throws QueryException
    */
   public function initialize(bool $detectAutoHost = true): self
   {

@@ -1,8 +1,8 @@
 parameters:
 
 ##### Entities Class
-  austral.entity.domain.class:                                              App\Entity\Austral\DomainBundle\Domain
+  austral.entity.domain.class:                                                App\Entity\Austral\DomainBundle\Domain
 
 ##### Doctrine Resolve target Entities
-  austral.resolve_target_entities.http:
+  austral.resolve_target_entities.domain:
     Austral\DomainBundle\Entity\Interfaces\DomainInterface:                   "%austral.entity.domain.class%"

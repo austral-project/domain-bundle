@@ -61,7 +61,7 @@ class AustralDomainExtension extends Extension
       $contents = require $bundlesConfigPath;
       if (array_key_exists("Austral\AdminBundle\AustralAdminBundle", $contents))
       {
-        $loader->load('austral_admin.yaml');
+        $loader->load('bridge/austral_admin.yaml');
       }
     }
   }

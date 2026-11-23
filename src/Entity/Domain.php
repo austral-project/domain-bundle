@@ -715,7 +715,7 @@ abstract class Domain extends Entity implements DomainInterface, FileInterface, 
    */
   public function getDomainTranslateByLanguage(?string $language = null): ?DomainInterface
   {
-    return $language ? AustralTools::valueByKey($this->getDomainsTranslate(), $language) : null;
+    return $language !== null ? AustralTools::valueByKey($this->getDomainsTranslate(), $language) : null;
   }
 
   /**

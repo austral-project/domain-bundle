@@ -27,8 +27,8 @@ use Doctrine\Common\Collections\Collection;
  */
 interface DomainInterface extends EntityInterface
 {
-  public const string SCHEME_HTTPS = 'https';
-  public const string SCHEME_HTTP = 'http';
+  const string SCHEME_HTTPS = 'https';
+  const string SCHEME_HTTP = 'http';
 
   /**
    * @return DomainInterface<T>|null

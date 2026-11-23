@@ -9,7 +9,7 @@
  * file that was distributed with this source code.
  */
 
-namespace Austral\DomainBundle\Listener;
+namespace Austral\DomainBundle\Bridge\Admin\Listener;
 
 use Austral\AdminBundle\Dashboard\Values as DashboardValues;
 use Austral\AdminBundle\Event\DashboardEvent;

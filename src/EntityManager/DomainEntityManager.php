@@ -21,7 +21,7 @@ use Doctrine\ORM\Query\QueryException;
  *
  * @template T of object
  *
- * @extends EntityManager<T>>
+ * @extends EntityManager<T>
  *
  * @author Matthieu Beurel <matthieu@austral.dev>
  *

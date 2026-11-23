@@ -9,7 +9,7 @@
  * file that was distributed with this source code.
  */
 
-namespace Austral\DomainBundle\Admin;
+namespace Austral\DomainBundle\Bridge\Admin\Admin;
 
 use App\Entity\Austral\DomainBundle\Domain;
 use Austral\AdminBundle\Admin\Admin;

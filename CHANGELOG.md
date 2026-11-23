@@ -8,18 +8,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- First version of `austral/domain-bundle`: the domain management extracted from http-bundle 3.1, which no longer depends on it.
+  - `Domain` entity, `DomainInterface`, `FilterByDomainTrait` and the `App\Entity\Austral\DomainBundle\Domain` skeleton (table `austral_http_domain`, unchanged).
+  - `DomainFilter` PHP attribute and `DomainFilterMapping`.
+  - `DomainsManagement`, `DomainEntityManager` and `DomainRepository`.
+  - Doctrine, entity manager and entity mapping listeners.
+  - `austral:domain:migrate` command.
+  - Administration screen and dashboard block in `src/Bridge/Admin/`, loaded only when admin-bundle is installed.
+
 ### Changed
 
 ### Fixed
 
 ### Removed
 
-## [4.0.0] - YYYY-MM-DD
-
-### Changed
-
-- Symfony 7.4 support, PHP 8.4 minimum.
-- Annotations replaced by PHP attributes.
-
-[Unreleased]: https://github.com/austral-project/domain-bundle/compare/v4.0.0...4.x
-[4.0.0]: https://github.com/austral-project/domain-bundle/releases/tag/v4.0.0
+[Unreleased]: https://github.com/austral-project/domain-bundle/commits/4.x

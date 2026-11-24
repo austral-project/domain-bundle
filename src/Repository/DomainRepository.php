@@ -11,7 +11,9 @@
 
 namespace Austral\DomainBundle\Repository;
 
+use Austral\CacheBundle\Cache\ResultCache;
 use Austral\DomainBundle\Entity\Interfaces\DomainInterface;
+use Austral\DomainBundle\Services\DomainsManagement;
 use Austral\EntityBundle\Repository\EntityRepository;
 use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\NoResultException;
@@ -86,11 +88,15 @@ class DomainRepository extends EntityRepository
   }
 
   /**
+   * selectAllEnabledDomains
+   *
+   * @param ResultCache|null $resultCache
+   *
    * @return array<string, DomainInterface<T>>
    *
    * @throws QueryException
    */
-  public function selectAllEnabledDomains(): array
+  public function selectAllEnabledDomains(?ResultCache $resultCache = null): array
   {
     $queryBuilder = $this->createQueryBuilder('root')
       ->andWhere('root.isEnabled = :isEnabled')
@@ -99,6 +105,7 @@ class DomainRepository extends EntityRepository
       ->orderBy('root.position', 'ASC');
 
     $query = $queryBuilder->getQuery();
+    $resultCache?->apply($query, DomainsManagement::CACHE_KEY_ENABLED_DOMAINS);
     try
     {
       /** @var array<string, DomainInterface<T>> $objects */

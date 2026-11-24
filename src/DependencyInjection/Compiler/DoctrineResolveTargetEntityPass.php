@@ -29,7 +29,7 @@ class DoctrineResolveTargetEntityPass implements CompilerPassInterface
    */
   public function process(ContainerBuilder $container): void
   {
-    $resolveTargetEntities = $container->getParameter('austral.resolve_target_entities.http');
+    $resolveTargetEntities = $container->getParameter('austral.resolve_target_entities.domain');
     if (is_iterable($resolveTargetEntities))
     {
       $definition = $container->findDefinition('doctrine.orm.listeners.resolve_target_entity');

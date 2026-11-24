@@ -6,57 +6,135 @@
 [![Symfony](https://img.shields.io/badge/symfony-7.4-black)](https://symfony.com/releases/7.4)
 [![License](https://img.shields.io/github/license/austral-project/domain-bundle)](LICENSE)
 
-Domain management and request context initialization for multi-domain Austral applications.
+Multi-domain management for Austral: the domains of the site, the domain of the current request, and the entities filtered by domain.
 
-> **Work in progress:** Austral Domain Bundle is under active development. Its public API and configuration may change before the first stable release.
-
-## Overview
-
-Austral Domain Bundle provides the domain management layer for Austral applications. It owns domain entities and filtering, and initializes the current domain context for each request.
-
-Its responsibilities include:
-
-- managing configured domains and their persistence;
-- resolving and initializing the current domain before request routing;
-- initializing the domain context lazily in CLI commands;
-- resetting request-specific state in long-running workers;
-- providing an optional administration integration when Austral Admin Bundle is installed.
-
-The domain listener runs before Symfony's router so that the current domain is available while the request is handled.
-
-## Architecture
-
-This package is independent from `http-bundle`. Neither bundle depends on the other:
-
-- `domain-bundle` owns domain management and current-domain initialization;
-- `http-bundle` provides the HTTP controller and event foundations.
-
-The existing `austral_http_domain` database table is retained to avoid moving domain data during the bundle separation.
+> This bundle is part of [Austral](https://github.com/austral-project), a modular back office and CMS for Symfony.
 
 ## Requirements
 
-- PHP `>=8.4 <9.0`
-- Symfony `^7.4`
-- Austral `4.x`
+- PHP 8.4 or higher
+- Symfony 7.4
+- Doctrine ORM 3
+- [austral/cache-bundle](https://github.com/austral-project/cache-bundle) 4.x, which keeps the domains in cache
 
 ## Installation
-
-Install the package with Composer:
 
 ```bash
 composer require austral/domain-bundle
 ```
 
-If your application does not enable Austral bundles automatically, register `Austral\DomainBundle\DomainBundle` in `config/bundles.php`.
+If you do not use Symfony Flex, register the bundle and cache-bundle in `config/bundles.php`:
+
+```php
+return [
+    // ...
+    Austral\CacheBundle\AustralCacheBundle::class => ['all' => true],
+    Austral\DomainBundle\AustralDomainBundle::class => ['all' => true],
+];
+```
+
+Create the domain entity of the application from the skeleton `src/Skeleton/Entity/Domain.php` (`App\Entity\Austral\DomainBundle\Domain`, table `austral_http_domain`), then update the database schema.
+
+## Configuration
+
+```yaml
+# config/packages/austral_domain.yaml
+austral_domain:
+  cache: true   # keep the enabled domains in the Doctrine result cache of cache-bundle
+```
+
+The cache of the domains also needs `austral_cache.enabled` (see cache-bundle).
+
+## Usage
+
+### Domains and current domain
+
+`DomainsManagement` (`austral.domain.management`) loads the enabled domains on first use. On each main request, the current domain is detected from the host, before the router. A virtual domain (an alias of a domain) resolves to its master domain. When no domain of the database is the master, a virtual master domain is created.
+
+```php
+use Austral\DomainBundle\Services\DomainsManagement;
+
+final class Menu
+{
+  public function __construct(private DomainsManagement $domainsManagement)
+  {
+  }
+
+  public function build(string $domainId): void
+  {
+    $current = $this->domainsManagement->getCurrentDomain();            // null on an unknown host, unless the master is virtual
+    $master = $this->domainsManagement->getDomainMaster();
+    $shop = $this->domainsManagement->getDomainById('shop');            // by id or keyname, null if unknown
+    $domain = $this->domainsManagement->getDomainByIdOrMaster($domainId); // the master domain if unknown
+    $id = $this->domainsManagement->resolveDomainId('current');         // id of an id, keyname, "master" or "current"
+    $isMultiDomain = $this->domainsManagement->isMultiDomain();         // more than one master domain
+  }
+}
+```
+
+In a command, there is no request: set the domain to process with `setCurrentDomain()`.
+
+### Entities filtered by domain
+
+```php
+use Austral\Contracts\Domain\FilterByDomainInterface;
+use Austral\DomainBundle\Attribute\DomainFilter;
+use Austral\DomainBundle\Entity\Traits\FilterByDomainTrait;
+
+#[DomainFilter(autoDomainId: true)]
+class Page extends Entity implements FilterByDomainInterface
+{
+  use FilterByDomainTrait;
+}
+```
+
+| Option | Default | Effect |
+|--------|---------|--------|
+| `autoDomainId` | `false` | The entity belongs to one domain, stored in `domainId`. |
+| `autoAttachement` | `true` | With `autoDomainId`, a new entity without domain is attached to the filter domain (the master domain by default) when it is flushed, with its children (`getChildren()`, `getChildrenEntities()`). A translation is attached through its master. |
+| `forAllDomainEnabled` | `false` | The entity can belong to all the domains (`for-all-domains`). |
+
+Without `autoDomainId` and `forAllDomainEnabled`, the entity belongs to several domains: it must provide `getDomainIds()` and `setDomainIds()`.
+
+### Cache
+
+The enabled domains are kept in the Doctrine result cache of cache-bundle. When a domain is saved, the cache is deleted and the domains are reloaded right away. A change made outside Doctrine is not seen: run `php bin/console austral:cache:rebuild --result` after it.
+
+When the cache of HTML renders of cache-bundle is used, the current domain is part of the key of the renders: each domain has its own render.
+
+### Migration of existing entities
+
+```bash
+php bin/console austral:domain:migrate           # entities without domain
+php bin/console austral:domain:migrate --force   # all the entities: replaces their domain
+```
+
+Attaches the existing entities filtered by domain (`autoDomainId`) to the master domain.
 
 ## Administration
 
-The administration screens and dashboard integration are provided through the bundle's admin bridge. They are loaded only when Austral Admin Bundle is installed.
+When [austral/admin-bundle](https://github.com/austral-project/admin-bundle) is installed, the bundle adds the administration screen of the domains and a block on the dashboard.
+
+## Documentation
+
+The full documentation is available at https://austral.dev.
+
+## Versions
+
+| Bundle | Symfony | PHP | Branch |
+|--------|---------|-----|---------|
+| 4.x    | 7.4     | ≥ 8.4 | `4.x` |
+
+In 3.x, the domains were managed by http-bundle. See the [CHANGELOG](CHANGELOG.md) and, to upgrade from 3.1, [UPGRADE-4.0](UPGRADE-4.0.md).
+
+## Contributing
+
+Contributions are welcome: see the [contributing guide](https://github.com/austral-project/.github/blob/master/CONTRIBUTING.md). To report a security issue, follow the [security policy](https://github.com/austral-project/.github/blob/master/SECURITY.md).
+
+## License
+
+MIT, see [LICENSE](LICENSE).
 
 ## Credits
 
 Created by [Matthieu Beurel](https://www.mbeurel.com). Sponsored by [Yipikai Studio](https://yipikai.studio).
-
-## License
-
-See the [LICENSE](LICENSE) file for details.

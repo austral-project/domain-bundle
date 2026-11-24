@@ -11,10 +11,14 @@
 
 namespace Austral\DomainBundle\DependencyInjection;
 
+use Austral\CacheBundle\Cache\ResultCache;
+use Austral\DomainBundle\Entity\Interfaces\DomainInterface;
+use Austral\DomainBundle\Services\DomainsManagement;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Extension\Extension;
 use Symfony\Component\DependencyInjection\Loader\YamlFileLoader;
+use Symfony\Component\DependencyInjection\Reference;
 
 /**
  * Austral Domain Extension.
@@ -32,18 +36,22 @@ class AustralDomainExtension extends Extension
    */
   public function load(array $configs, ContainerBuilder $container): void
   {
-    $configuration = new Configuration();
-    $config = $this->processConfiguration($configuration, $configs);
-
-    $defaultConfig = $configuration->getConfigDefault();
-    $config = array_replace_recursive($defaultConfig, $config);
+    $config = $this->processConfiguration(new Configuration(), $configs);
     $container->setParameter('austral_domain', $config);
 
     $loader = new YamlFileLoader($container, new FileLocator(__DIR__.'/../Resources/config'));
     $loader->load('parameters.yaml');
     $loader->load('services.yaml');
     $loader->load('command.yaml');
-    $this->loadConfigToAustralBundle($container, $loader);
+    $this->loadBridges($container, $loader);
+
+    if ($config['cache'])
+    {
+      // The key is deleted by cache-bundle when a domain is saved (EntityCacheListener).
+      $container->getDefinition(DomainsManagement::class)
+        ->setArgument('$resultCache', new Reference(ResultCache::class))
+        ->addTag('austral.cache.result_key', ['key' => DomainsManagement::CACHE_KEY_ENABLED_DOMAINS, 'class' => DomainInterface::class]);
+    }
   }
 
   /**
@@ -52,17 +60,14 @@ class AustralDomainExtension extends Extension
    *
    * @throws \Exception
    */
-  protected function loadConfigToAustralBundle(ContainerBuilder $container, YamlFileLoader $loader): void
+  protected function loadBridges(ContainerBuilder $container, YamlFileLoader $loader): void
   {
-    $projectDir = $container->getParameter('kernel.project_dir');
-    $bundlesConfigPath = ($projectDir && is_string($projectDir) ? $projectDir : '').'/config/bundles.php';
-    if (file_exists($bundlesConfigPath))
+    $bundles = $container->hasParameter('kernel.bundles') ? $container->getParameter('kernel.bundles') : [];
+    $bundles = is_array($bundles) ? $bundles : [];
+
+    if (in_array('Austral\\AdminBundle\\AustralAdminBundle', $bundles, true))
     {
-      $contents = require $bundlesConfigPath;
-      if (array_key_exists("Austral\AdminBundle\AustralAdminBundle", $contents))
-      {
-        $loader->load('bridge/austral_admin.yaml');
-      }
+      $loader->load('bridge/admin.yaml');
     }
   }
 
@@ -71,6 +76,6 @@ class AustralDomainExtension extends Extension
    */
   public function getNamespace(): string
   {
-    return 'https://austral.app/schema/dic/austral_domain';
+    return 'https://austral.dev/schema/dic/austral_domain';
   }
 }

@@ -30,15 +30,14 @@ class Configuration implements ConfigurationInterface
   {
     $treeBuilder = new TreeBuilder('austral_domain');
 
-    return $treeBuilder;
-  }
+    $treeBuilder->getRootNode()
+      ->children()
+        ->booleanNode('cache')
+          ->info('Keeps the enabled domains in the Doctrine result cache of cache-bundle (also needs austral_cache.enabled).')
+          ->defaultTrue()
+        ->end()
+      ->end();
 
-  /**
-   * @return array<string, mixed>
-   */
-  public function getConfigDefault(): array
-  {
-    return [
-    ];
+    return $treeBuilder;
   }
 }

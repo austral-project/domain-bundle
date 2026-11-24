@@ -11,6 +11,7 @@
 
 namespace Austral\DomainBundle\EntityManager;
 
+use Austral\CacheBundle\Cache\ResultCache;
 use Austral\DomainBundle\Entity\Interfaces\DomainInterface;
 use Austral\DomainBundle\Repository\DomainRepository;
 use Austral\EntityBundle\EntityManager\EntityManager;
@@ -78,12 +79,14 @@ class DomainEntityManager extends EntityManager
   }
 
   /**
+   * @param ResultCache|null $resultCache
+   *
    * @return array<string, DomainInterface<T>>
    *
    * @throws QueryException
    */
-  public function selectAllEnabledDomains(): array
+  public function selectAllEnabledDomains(?ResultCache $resultCache = null): array
   {
-    return $this->getRepository()?->selectAllEnabledDomains() ?? [];
+    return $this->getRepository()?->selectAllEnabledDomains($resultCache) ?? [];
   }
 }

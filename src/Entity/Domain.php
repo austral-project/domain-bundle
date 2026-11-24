@@ -11,12 +11,12 @@
 
 namespace Austral\DomainBundle\Entity;
 
+use Austral\Contracts\File\CropperInterface;
 use Austral\Contracts\File\FileInterface;
 use Austral\DomainBundle\Entity\Interfaces\DomainInterface;
 use Austral\EntityBundle\Entity\Entity;
 use Austral\EntityBundle\Entity\Traits\EntityTimestampableTrait;
 use Austral\EntityFileBundle\Attribute as AustralFile;
-use Austral\EntityFileBundle\Entity\Interfaces\CropperInterface;
 use Austral\EntityFileBundle\Entity\Traits\EntityFileCropperTrait;
 use Austral\EntityFileBundle\Entity\Traits\EntityFileTrait;
 use Austral\ToolsBundle\AustralTools;
@@ -284,7 +284,7 @@ abstract class Domain extends Entity implements DomainInterface, FileInterface, 
    */
   public function getUrlParameterStatusName(): string
   {
-    return $this->name ?? $this->domain;
+    return $this->name ?: $this->domain;
   }
 
   /**
@@ -292,7 +292,7 @@ abstract class Domain extends Entity implements DomainInterface, FileInterface, 
    */
   public function __toString()
   {
-    return $this->name ?? $this->domain;
+    return $this->name ?: $this->domain;
   }
 
   /**
@@ -715,11 +715,11 @@ abstract class Domain extends Entity implements DomainInterface, FileInterface, 
    */
   public function getDomainTranslateByLanguage(?string $language = null): ?DomainInterface
   {
-    return $language !== null ? AustralTools::valueByKey($this->getDomainsTranslate(), $language) : null;
+    return null !== $language ? AustralTools::valueByKey($this->getDomainsTranslate(), $language) : null;
   }
 
   /**
-   * @return array
+   * @return array<string, mixed>
    */
   public function getConfigKeys(): array
   {
@@ -727,7 +727,7 @@ abstract class Domain extends Entity implements DomainInterface, FileInterface, 
   }
 
   /**
-   * @param array $configKeys
+   * @param array<string, mixed> $configKeys
    *
    * @return $this
    */

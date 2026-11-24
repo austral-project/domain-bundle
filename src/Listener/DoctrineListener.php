@@ -12,16 +12,15 @@
 namespace Austral\DomainBundle\Listener;
 
 use Austral\Contracts\Entity\EntityInterface;
-use Austral\DomainBundle\Services\DomainsManagement;
-use Doctrine\ORM\Events;
-use Doctrine\Persistence\Event\LifecycleEventArgs;
-use Doctrine\Persistence\ObjectManager;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Austral\DomainBundle\Services\DomainAttachment;
+use Doctrine\ORM\Event\OnFlushEventArgs;
 
 /**
- * Austral Doctrine Listener.
+ * Attaches the new and updated entities (and their children) to the filter domain.
  *
- * @template TObjectManager of ObjectManager
+ * Everything is done in onFlush: the changes made to the entities are taken into account by recomputing
+ * their changeset, in the same flush.
+ *
  * @template T of object
  *
  * @author Matthieu Beurel <matthieu@austral.dev>
@@ -31,88 +30,36 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 class DoctrineListener
 {
   /**
-   * @var bool
+   * @param DomainAttachment<T> $domainAttachment
    */
-  protected bool $postFlush = false;
+  public function __construct(protected DomainAttachment $domainAttachment)
+  {
+  }
 
   /**
-   * DoctrineListener constructor
+   * @param OnFlushEventArgs $args
    *
-   * @param DomainsManagement<T> $domainAttachement
+   * @return void
    */
-  public function __construct(
-    #[Autowire(service: 'austral.http.domains.management')] protected DomainsManagement $domainAttachement
-  ) {
-  }
-
-  /**
-   * @return string[]
-   */
-  public function getSubscribedEvents(): array
+  public function onFlush(OnFlushEventArgs $args): void
   {
-    return [
-      Events::postLoad,
-      Events::prePersist,
-      Events::preUpdate,
-      Events::postRemove,
-      Events::postFlush,
-    ];
-  }
+    $entityManager = $args->getObjectManager();
+    $unitOfWork = $entityManager->getUnitOfWork();
 
-  /**
-   * @param LifecycleEventArgs<TObjectManager> $args
-   */
-  public function postLoad(LifecycleEventArgs $args): void
-  {
-  }
-
-  /**
-   * @param LifecycleEventArgs<TObjectManager> $args
-   */
-  public function prePersist(LifecycleEventArgs $args): void
-  {
-    $object = $args->getObject();
-    if ($object instanceof EntityInterface)
+    foreach ([...$unitOfWork->getScheduledEntityInsertions(), ...$unitOfWork->getScheduledEntityUpdates()] as $object)
     {
-      $this->domainAttachement->objectDomainAttachement($object);
-    }
-  }
-
-  /**
-   * @param LifecycleEventArgs<TObjectManager> $args
-   */
-  public function preUpdate(LifecycleEventArgs $args): void
-  {
-    if (!$this->postFlush)
-    {
-      $object = $args->getObject();
       if ($object instanceof EntityInterface)
       {
-        $this->domainAttachement->objectDomainAttachement($object);
+        $this->domainAttachment->attach($object);
       }
     }
-  }
 
-  /**
-   * @param LifecycleEventArgs<TObjectManager> $args
-   */
-  public function postRemove(LifecycleEventArgs $args): void
-  {
-  }
-
-  /**
-   * @param ObjectManager $args
-   */
-  public function postFlush(ObjectManager $args): void
-  {
-    if (!$this->postFlush)
+    foreach ($this->domainAttachment->pullAttachedObjects() as $object)
     {
-      $this->postFlush = true;
-      foreach ($this->domainAttachement->getObjectsDomainAttachement() as $object)
+      if ($unitOfWork->isInIdentityMap($object) || $unitOfWork->isScheduledForInsert($object))
       {
-        $args->persist($object);
+        $unitOfWork->recomputeSingleEntityChangeSet($entityManager->getClassMetadata($object::class), $object);
       }
-      $args->flush();
     }
   }
 }

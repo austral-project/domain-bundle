@@ -17,7 +17,6 @@ use Austral\DomainBundle\Services\DomainsManagement;
 use Austral\EntityBundle\Event\EntityManagerEvent;
 use Austral\EntityBundle\Mapping\Mapping;
 use Austral\HttpBundle\Services\HttpRequest;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Austral EntityManager Listener.
@@ -36,9 +35,9 @@ class EntityManagerListener
    * @param HttpRequest<T>       $httpRequest
    */
   public function __construct(
-    #[Autowire(service: 'austral.entity.mapping')] protected Mapping $mapping,
-    #[Autowire(service: 'austral.http.domains.management')] protected DomainsManagement $domainsManagement,
-    #[Autowire(service: 'austral.http.request')] protected HttpRequest $httpRequest
+    protected Mapping $mapping,
+    protected DomainsManagement $domainsManagement,
+    protected HttpRequest $httpRequest
   ) {
   }
 
@@ -59,9 +58,9 @@ class EntityManagerListener
     if (array_key_exists('domainId', $routeParams) && $domainFilterMapping instanceof DomainFilterMapping)
     {
       $domainByRouteParameter = $this->domainsManagement->getDomainById($routeParams['domainId']);
-      if ($domainFilterMapping->getAutoDomainId() && $domainByRouteParameter->getIsMaster())
+      if ($domainFilterMapping->getAutoDomainId() && $domainByRouteParameter?->getIsMaster())
       {
-        $object->setDomainId($routeParams['domainId']);
+        $object->setDomainId($domainByRouteParameter->getId());
       }
     }
   }

@@ -14,7 +14,6 @@ namespace Austral\DomainBundle\Bridge\Admin\Listener;
 use Austral\AdminBundle\Dashboard\Values as DashboardValues;
 use Austral\AdminBundle\Event\DashboardEvent;
 use Austral\DomainBundle\Services\DomainsManagement;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Austral DashboardListener Listener.
@@ -31,7 +30,7 @@ class DashboardListener
    * @param DomainsManagement<T> $domainsManagement
    */
   public function __construct(
-    #[Autowire(service: 'austral.http.domains.management')] protected DomainsManagement $domainsManagement
+    protected DomainsManagement $domainsManagement
   ) {
   }
 
@@ -42,7 +41,7 @@ class DashboardListener
    */
   public function dashboard(DashboardEvent $dashboardEvent): void
   {
-    if ($this->domainsManagement->getEnabledDomainWithoutVirtual())
+    if ($this->domainsManagement->isMultiDomain())
     {
       $dashboardTileDomains = new DashboardValues\Tile('domains');
       $dashboardTileDomains->setEntitled('dashboard.tiles.domains.count.entitled')

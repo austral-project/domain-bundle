@@ -1,10 +1,12 @@
 services:
-  _defaults:
-    autowire:     true
-    public:       false
 
-##### Command to generate Url Parameters
-  austral.http.domain_attachement_migrater.command:
-    class:        Austral\DomainBundle\Command\DomainAttachementMigrateCommand
+  ##### Command to attach the existing objects to the master domain
+  Austral\DomainBundle\Command\DomainAttachementMigrateCommand:
+    arguments:
+      $entityManager:     '@austral.entity_manager'
+      $mapping:           '@austral.entity.mapping'
+      $domainsManagement: '@Austral\DomainBundle\Services\DomainsManagement'
+    calls:
+      - [ setEventDispatcher, [ '@event_dispatcher' ] ]
     tags:
-      - { name: console.command, command: "austral:domain:migrate" }
+      - { name: console.command, command: 'austral:domain:migrate' }

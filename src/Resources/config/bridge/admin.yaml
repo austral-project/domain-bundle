@@ -1,26 +1,20 @@
 services:
-  _defaults:
-    autowire:      true
-    autoconfigure: true
-    public:        true
 
   ##### Listener
-  austral.domain.dashboard.listener:
-    class:          Austral\DomainBundle\Listener\DashboardListener
-    arguments:      [ "@austral.domain.domains.management" ]
+  Austral\DomainBundle\Bridge\Admin\Listener\DashboardListener:
+    arguments:
+      $domainsManagement: '@austral.domain.management'
     tags:
       - { name: kernel.event_listener, event: "austral.event.admin.dashboard", method: dashboard }
 
 
 parameters:
-
-  austral.admin.class.domain.class:                                 Austral\DomainBundle\Admin\DomainAdmin
-
-  austral.admin.modules.domain_bundle.domain.enabled:                 true
+  austral.admin.class.domain.class:                     Austral\DomainBundle\Bridge\Admin\Admin\DomainAdmin
+  austral.admin.modules.domain_bundle.domain.enabled:   true
 
   austral_admin.modules.domain_bundle:
     domain:
-      enabled:                    "%austral.admin.modules.http_bundle.domain.enabled%"
+      enabled:                    "%austral.admin.modules.domain_bundle.domain.enabled%"
       navigation:
         position:                 100
       name:                       "Domain"

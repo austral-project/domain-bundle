@@ -1,47 +1,74 @@
-parameters:
-
 services:
-  _defaults:
-    autowire:      true
-    autoconfigure: true
-    public:        true
 
-
-##### Http Listener Kernel
-
-  Austral\DomainBundle\Listener\DoctrineListener: "@austral.domain.doctrine.listener"
-  austral.domain.doctrine.listener:
-    class:        Austral\DomainBundle\Listener\DoctrineListener
-    arguments:    [ "@austral.domain.domains.management" ]
-    tags:
-      - { name: doctrine.event_subscriber, connection: default }
-
-  Austral\DomainBundle\Listener\EntityMappingListener:  "@austral.domain.entity_mapping.listener"
-  austral.domain.entity_mapping.listener:
-    class:        Austral\DomainBundle\Listener\EntityMappingListener
-    tags:
-      - { name: kernel.event_listener, event: "austral.event.entity.initialise.mapping", method: mapping }
-
-  ##### Entity Manager Listener
-  Austral\DomainBundle\Listener\EntityManagerListener:  "@austral.domain.entity_manager.listener"
-  austral.domain.entity_manager.listener:
-    class:          Austral\DomainBundle\Listener\EntityManagerListener
-    arguments:      ["@austral.entity.mapping", "@austral.domain.domains.management", "@austral.http.request"]
-    tags:
-      - { name: kernel.event_listener, event: "austral.entity_manager.duplicate", method: duplicate }
-
-##### Http Services
-  Austral\DomainBundle\Services\DomainsManagement: "@austral.http.domains.management"
-  austral.domain.domains.management:
-    class:          Austral\DomainBundle\Services\DomainsManagement
+  ##### Domain Management ($resultCache is set by AustralDomainExtension when austral_domain.cache is enabled)
+  Austral\DomainBundle\Services\DomainsManagement:
     arguments:
-      - "@austral.entity.mapping"
-      - "@austral.entity_manager.domain"
-      - "@austral.http.request"
-      - "@austral.tools.debug"
+      $domainEntityManager: '@Austral\DomainBundle\EntityManager\DomainEntityManager'
+      $requestStack:        '@request_stack'
+      $httpRequest:         '@austral.http.request'
+      $debug:               '@austral.tools.debug'
+      $resultCache:         ~
+    tags:
+      - { name: kernel.reset, method: reset }
+  austral.domain.management:
+    alias:  Austral\DomainBundle\Services\DomainsManagement
+    public: true
 
-##### Domain Entity Manager
-  Austral\DomainBundle\EntityManager\DomainEntityManager: "@austral.entity_manager.domain"
+  Austral\DomainBundle\Services\DomainAttachment:
+    arguments:
+      $mapping:           '@austral.entity.mapping'
+      $domainsManagement: '@Austral\DomainBundle\Services\DomainsManagement'
+    tags:
+      - { name: kernel.reset, method: reset }
+
+  ##### Domain Entity Manager
+  Austral\DomainBundle\EntityManager\DomainEntityManager:
+    arguments:
+      $doctrineEntityManager: '@doctrine.orm.entity_manager'
+      $eventDispatcher:       '@event_dispatcher'
+      $class:                 '%austral.entity.domain.class%'
+  # Public: the admin module fetches it by name (entity_manager: austral.entity_manager.domain)
   austral.entity_manager.domain:
-    class:          Austral\DomainBundle\EntityManager\DomainEntityManager
-    arguments:      [ "@doctrine.orm.entity_manager",  "@event_dispatcher", "%austral.entity.domain.class%" ]
+    alias:  Austral\DomainBundle\EntityManager\DomainEntityManager
+    public: true
+
+  ##### Cache: the current domain is part of the key of the renders
+  Austral\DomainBundle\Cache\DomainCacheContext:
+    arguments:
+      $domainsManagement: '@Austral\DomainBundle\Services\DomainsManagement'
+    tags:
+      - { name: austral.cache.context_provider }
+
+  ##### Listeners
+  Austral\DomainBundle\Listener\RequestListener:
+    arguments:
+      $domainsManagement: '@Austral\DomainBundle\Services\DomainsManagement'
+      $httpRequest:       '@austral.http.request'
+    tags:
+      - { name: kernel.event_listener, event: kernel.request, method: onRequest, priority: 40 }
+      - { name: kernel.event_listener, event: kernel.request, method: onRequestLanguage, priority: 20 }
+
+  Austral\DomainBundle\Listener\DoctrineListener:
+    arguments:
+      $domainAttachment: '@Austral\DomainBundle\Services\DomainAttachment'
+    tags:
+      - { name: doctrine.event_listener, event: onFlush }
+
+  Austral\DomainBundle\Listener\CacheListener:
+    arguments:
+      $domainsManagement: '@Austral\DomainBundle\Services\DomainsManagement'
+    tags:
+      - { name: kernel.event_listener, event: 'austral.cache.invalidated', method: onInvalidated }
+      - { name: kernel.event_listener, event: 'austral.cache.rebuild', method: onRebuild }
+
+  Austral\DomainBundle\Listener\EntityMappingListener:
+    tags:
+      - { name: kernel.event_listener, event: 'austral.event.entity.initialise.mapping', method: mapping }
+
+  Austral\DomainBundle\Listener\EntityManagerListener:
+    arguments:
+      $mapping:           '@austral.entity.mapping'
+      $domainsManagement: '@Austral\DomainBundle\Services\DomainsManagement'
+      $httpRequest:       '@austral.http.request'
+    tags:
+      - { name: kernel.event_listener, event: 'austral.entity_manager.duplicate', method: duplicate }

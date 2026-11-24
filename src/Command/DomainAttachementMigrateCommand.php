@@ -23,7 +23,6 @@ use Austral\ToolsBundle\Command\Base\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Austral Roles Command.
@@ -36,11 +35,6 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  */
 class DomainAttachementMigrateCommand extends Command
 {
-  /**
-   * @var string
-   */
-  protected static $defaultName = 'austral:domain:migrate';
-
   /**
    * @var string
    */
@@ -76,9 +70,9 @@ class DomainAttachementMigrateCommand extends Command
    * @param callable|null        $code
    */
   public function __construct(
-    #[Autowire(service: 'austral.entity_manager')] protected EntityManager $entityManager,
-    #[Autowire(service: 'austral.entity.mapping')] protected Mapping $mapping,
-    #[Autowire(service: 'austral.http.domains.management')] protected DomainsManagement $domainsManagement,
+    protected EntityManager $entityManager,
+    protected Mapping $mapping,
+    protected DomainsManagement $domainsManagement,
     ?string $name = null,
     ?callable $code = null
   ) {
@@ -90,6 +84,7 @@ class DomainAttachementMigrateCommand extends Command
    * @param OutputInterface $output
    *
    * @throws \Exception
+   * @throws \Throwable
    */
   protected function executeCommand(InputInterface $input, OutputInterface $output): void
   {

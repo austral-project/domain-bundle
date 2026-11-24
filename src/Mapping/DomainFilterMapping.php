@@ -42,13 +42,6 @@ final class DomainFilterMapping extends EntityClassMapping
   protected bool $autoAttachement = false;
 
   /**
-   * Constructor.
-   */
-  public function __construct()
-  {
-  }
-
-  /**
    * @return bool
    */
   public function getAutoDomainId(): bool

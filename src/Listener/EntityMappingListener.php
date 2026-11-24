@@ -36,6 +36,7 @@ class EntityMappingListener
    * @return void
    *
    * @throws \Exception
+   * @throws \Throwable
    */
   public function mapping(EntityMappingEvent $entityAttributeEvent): void
   {

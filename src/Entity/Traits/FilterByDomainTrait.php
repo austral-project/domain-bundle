@@ -29,12 +29,11 @@ use Doctrine\ORM\Mapping as ORM;
  */
 trait FilterByDomainTrait
 {
-
   /**
-   * @var string
+   * @var string|null
    */
   #[ORM\Column(name: 'domainId', type: 'string', length: 255, nullable: true)]
-  protected string $domainId = '';
+  protected ?string $domainId = null;
 
   /**
    * @return string|null

@@ -11,37 +11,65 @@
 
 namespace Austral\DomainBundle\Services;
 
+use Austral\CacheBundle\Cache\ResultCache;
 use Austral\Contracts\Domain\FilterByDomainInterface;
-use Austral\Contracts\Entity\EntityInterface;
-use Austral\Contracts\Translate\TranslateChildInterface;
 use Austral\DomainBundle\Entity\Interfaces\DomainInterface;
 use Austral\DomainBundle\EntityManager\DomainEntityManager;
-use Austral\DomainBundle\Mapping\DomainFilterMapping;
-use Austral\EntityBundle\Mapping\Mapping;
 use Austral\HttpBundle\Services\HttpRequest;
-use Austral\ToolsBundle\AustralTools;
 use Austral\ToolsBundle\Services\Debug;
-use Doctrine\ORM\Query\QueryException;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Routing\RequestContext;
+use Symfony\Contracts\Service\ResetInterface;
 
 /**
- * Austral Domain Service.
+ * Registry of the domains, and domain of the current request.
+ *
+ * The enabled domains are loaded on first use, never when the service is created: from the Doctrine result
+ * cache of cache-bundle when austral_domain.cache is enabled (key CACHE_KEY_ENABLED_DOMAINS, invalidated when
+ * a domain is saved), otherwise from the database.
+ * The current domain is detected from the host of the main request: by RequestListener on kernel.request,
+ * or on first use when no listener ran (console). reset() forgets everything between two requests
+ * of a long-running worker (tag kernel.reset).
  *
  * @template T of object
  *
  * @author Matthieu Beurel <matthieu@austral.dev>
  */
-class DomainsManagement
+class DomainsManagement implements ResetInterface
 {
   public const string DOMAIN_ID_FOR_ALL_DOMAINS = 'for-all-domains';
   public const string DOMAIN_ID_MASTER = FilterByDomainInterface::DOMAIN_ID_MASTER;
   public const string DOMAIN_ID_CURRENT = 'current';
 
   /**
+   * Key of the enabled domains in the Doctrine result cache of cache-bundle.
+   */
+  public const string CACHE_KEY_ENABLED_DOMAINS = 'austral_domain.enabled_domains';
+
+  /**
+   * @var bool
+   */
+  protected bool $loaded = false;
+
+  /**
+   * Enabled domains of the database, indexed by host.
+   *
    * @var array<string, DomainInterface<T>>
    */
   protected array $domains = [];
+
+  /**
+   * Every known domain (database and virtual), indexed by id.
+   *
+   * @var array<string, DomainInterface<T>>
+   */
+  protected array $domainsById = [];
+
+  /**
+   * @var array<string, string>
+   */
+  protected array $domainsIdByKeyname = [];
 
   /**
    * @var array<string, DomainInterface<T>>
@@ -54,19 +82,28 @@ class DomainsManagement
   protected array $domainsMaster = [];
 
   /**
-   * @var array<string, DomainInterface<T>>
+   * Ids of the domains that have a request context: enabled domains of the database that are not redirections.
+   *
+   * @var array<string, true>
    */
-  protected array $domainsById = [];
+  protected array $requestContextDomainIds = [];
 
   /**
-   * @var array<string, string>
+   * @var DomainInterface<T>|null
    */
-  protected array $domainsIdByKeyname = [];
+  protected ?DomainInterface $domainMaster = null;
 
   /**
-   * @var array<string, RequestContext>
+   * True when no domain of the database is the master: a virtual master domain is created.
+   *
+   * @var bool
    */
-  protected array $requestContextByDomainId = [];
+  protected bool $virtualDomainMaster = false;
+
+  /**
+   * @var bool
+   */
+  protected bool $currentDomainResolved = false;
 
   /**
    * @var DomainInterface<T>|null
@@ -79,158 +116,88 @@ class DomainsManagement
   protected ?DomainInterface $currentDomainWithVirtual = null;
 
   /**
-   * @var DomainInterface<T>|null
-   */
-  protected ?DomainInterface $domainMaster = null;
-
-  /**
    * @var string|null
    */
   protected ?string $filterDomainId = null;
 
   /**
-   * @var int
+   * True when the filter domain was set by setFilterDomainId(): loading the domains does not replace it.
+   *
+   * @var bool
    */
-  protected int $enabledDomainWithoutVirtual = 0;
+  protected bool $filterDomainIdDefined = false;
 
   /**
-   * Domains Service constructor.
-   *
-   * @param Mapping<T>             $mapping
    * @param DomainEntityManager<T> $domainEntityManager
+   * @param RequestStack           $requestStack
    * @param HttpRequest<T>         $httpRequest
    * @param Debug                  $debug
+   * @param ResultCache|null       $resultCache         null when austral_domain.cache is disabled
    */
   public function __construct(
-    #[Autowire(service: 'austral.entity.mapping')] protected Mapping $mapping,
-    #[Autowire(service: 'austral.entity_manager.domain')] protected DomainEntityManager $domainEntityManager,
-    #[Autowire(service: 'austral.http.request')] protected HttpRequest $httpRequest,
-    #[Autowire(service: 'austral.tools.debug')] protected Debug $debug
+    protected DomainEntityManager $domainEntityManager,
+    protected RequestStack $requestStack,
+    protected HttpRequest $httpRequest,
+    protected Debug $debug,
+    protected ?ResultCache $resultCache = null
   ) {
-    $this->createVirtualDomain(self::DOMAIN_ID_FOR_ALL_DOMAINS);
   }
 
   /**
-   * @return string|null
-   */
-  public function getHost(): ?string
-  {
-    return $this->httpRequest->getRequest()?->getHost();
-  }
-
-  /**
-   * getHttpRequest
+   * Detects the current domain from the host of the request (the main request by default).
    *
-   * @return HttpRequest<T>
-   */
-  public function getHttpRequest(): HttpRequest
-  {
-    return $this->httpRequest;
-  }
-
-  /**
-   * @param bool $detectAutoHost
+   * @param Request|null $request
    *
    * @return $this
-   *
-   * @throws QueryException
    */
-  public function initialize(bool $detectAutoHost = true): self
+  public function resolveCurrentDomain(?Request $request = null): self
   {
-    $this->debug->stopWatchStart('austral.domain_management.initialize', 'austral.http.domain_management');
-    if (!$this->domains)
+    $this->load();
+    $host = ($request ?? $this->requestStack->getMainRequest())?->getHost();
+
+    $this->currentDomain = null;
+    $this->currentDomainWithVirtual = null;
+    if (null !== $host && array_key_exists($host, $this->domains))
     {
-      $this->domains = $this->domainEntityManager->selectAllEnabledDomains();
-
-      /** @var DomainInterface<T> $domain */
-      foreach ($this->domains as $domain)
-      {
-        $domain->setRequestLanguage($this->httpRequest->getLanguage());
-        $this->domainsById[$domain->getId()] = $domain;
-        if ($this->getHost() === $domain->getDomain() && $detectAutoHost)
-        {
-          $this->currentDomainWithVirtual = $domain;
-          if ($domain->getIsVirtual() && $domain->getMaster())
-          {
-            $this->currentDomain = $domain->getMaster();
-          }
-          else
-          {
-            $this->currentDomain = $domain;
-          }
-        }
-        if (!$this->domainMaster && $domain->getIsMaster())
-        {
-          $this->domainMaster = $domain;
-          $this->domainsIdByKeyname[self::DOMAIN_ID_MASTER] = $domain->getId();
-          $this->setFilterDomainId($domain->getId());
-        }
-        if (!$domain->getIsRedirect())
-        {
-          if (!$domain->getIsVirtual())
-          {
-            $this->domainsWithoutVirtual[$domain->getId()] = $domain;
-            if ($domain->getIsMaster())
-            {
-              $this->domainsMaster[$domain->getId()] = $domain;
-            }
-          }
-          $this->domainsIdByKeyname[$domain->getKeyname()] = $domain->getId();
-          $requestContext = new RequestContext();
-          if ($this->httpRequest->getRequest())
-          {
-            $requestContext->fromRequest($this->httpRequest->getRequest());
-          }
-          $requestContext->setScheme($domain->getScheme());
-          $this->requestContextByDomainId[$domain->getId()] = $requestContext->setHost($domain->getDomain());
-        }
-      }
-
-      if ($this->getDomainForAll())
-      {
-        $this->domainsById[$this->getDomainForAll()->getId()] = $this->getDomainForAll();
-        if (!$this->domainMaster)
-        {
-          $domainMaster = $this->createVirtualDomain(self::DOMAIN_ID_MASTER);
-          $domainMaster->setIsMaster(true);
-          $this->domainMaster = $domainMaster;
-          $this->currentDomain = $domainMaster;
-          $this->setFilterDomainId($domainMaster->getId());
-          $this->domainsWithoutVirtual[$domainMaster->getId()] = $domainMaster;
-        }
-      }
+      $domain = $this->domains[$host];
+      $this->currentDomainWithVirtual = $domain;
+      $this->currentDomain = $domain->getIsVirtual() && $domain->getMaster() ? $domain->getMaster() : $domain;
     }
-    $this->debug->stopWatchStop('austral.domain_management.initialize');
+    if ($this->virtualDomainMaster)
+    {
+      $this->currentDomain = $this->domainMaster;
+    }
+    $this->currentDomainResolved = true;
 
     return $this;
   }
 
   /**
-   * @param string $keyname
+   * Sets the language of the request on every domain (DomainInterface::getCurrentLanguage()).
    *
-   * @return DomainInterface<T>
+   * @param string|null $language
+   *
+   * @return $this
    */
-  protected function createVirtualDomain(string $keyname): DomainInterface
+  public function applyRequestLanguage(?string $language): self
   {
-    $domainClass = $this->domainEntityManager->getClass();
-    $domain = new $domainClass();
-    $domain->setId($keyname);
-    $domain->setName($keyname);
-    $domain->setKeyname($keyname);
-    $domain->setDomain($this->getHost() ?? '');
-    $domain->setIsVirtual(true);
-    $domain->setRequestLanguage($this->httpRequest->getLanguage());
-    $this->domainsById[$keyname] = $domain;
-    $this->domainsIdByKeyname[$domain->getKeyname()] = $domain->getId();
+    foreach ($this->domainsById as $domain)
+    {
+      $domain->setRequestLanguage($language);
+    }
 
-    return $domain;
+    return $this;
   }
 
   /**
+   * True when the database has more than one master domain (replaces getEnabledDomainWithoutVirtual()).
+   *
    * @return bool
    */
-  public function getEnabledDomainWithoutVirtual(): bool
+  public function isMultiDomain(): bool
   {
+    $this->load();
+
     return count($this->domainsMaster) > 1;
   }
 
@@ -239,6 +206,8 @@ class DomainsManagement
    */
   public function getDomainsWithoutVirtual(): array
   {
+    $this->load();
+
     return $this->domainsWithoutVirtual;
   }
 
@@ -247,6 +216,8 @@ class DomainsManagement
    */
   public function getDomains(): array
   {
+    $this->load();
+
     return $this->domains;
   }
 
@@ -255,6 +226,8 @@ class DomainsManagement
    */
   public function getDomainMaster(): ?DomainInterface
   {
+    $this->load();
+
     return $this->domainMaster;
   }
 
@@ -265,6 +238,11 @@ class DomainsManagement
    */
   public function getCurrentDomain(bool $withoutVirtual = true): ?DomainInterface
   {
+    if (!$this->currentDomainResolved)
+    {
+      $this->resolveCurrentDomain();
+    }
+
     return $withoutVirtual ? $this->currentDomain : $this->currentDomainWithVirtual;
   }
 
@@ -275,7 +253,9 @@ class DomainsManagement
    */
   public function setCurrentDomain(DomainInterface $currentDomain): self
   {
+    $this->load();
     $this->currentDomain = $currentDomain;
+    $this->currentDomainResolved = true;
 
     return $this;
   }
@@ -285,57 +265,82 @@ class DomainsManagement
    */
   public function getCurrentLanguage(): ?string
   {
-    return $this->getCurrentDomain() ? ($this->getCurrentDomain()->getLanguage() ?: $this->httpRequest->getLanguage()) : $this->httpRequest->getLanguage();
+    return $this->getCurrentDomain()?->getLanguage() ?: $this->httpRequest->getLanguage();
   }
 
   /**
+   * Id of a domain given by id, keyname, "master" (default) or "current" (replaces getReelDomainId()).
+   *
    * @param string|null $domainId
    * @param bool        $withoutVirtual
    *
    * @return string|null
    */
-  public function getReelDomainId(?string $domainId = DomainsManagement::DOMAIN_ID_MASTER, bool $withoutVirtual = true): ?string
+  public function resolveDomainId(?string $domainId = self::DOMAIN_ID_MASTER, bool $withoutVirtual = true): ?string
   {
-    $domainId = 'current' === $domainId ? $this->getCurrentDomain($withoutVirtual)?->getId() : null;
-    $domainId ??= DomainsManagement::DOMAIN_ID_MASTER;
+    $this->load();
+    $domainId ??= self::DOMAIN_ID_MASTER;
+    if (self::DOMAIN_ID_CURRENT === $domainId)
+    {
+      $domainId = $this->getCurrentDomain($withoutVirtual)?->getId() ?? self::DOMAIN_ID_MASTER;
+    }
 
-    return array_key_exists($domainId, $this->domainsIdByKeyname) ? $this->domainsIdByKeyname[$domainId] : $domainId;
+    return $this->domainsIdByKeyname[$domainId] ?? $domainId;
   }
 
   /**
+   * Domain by id or keyname; the current domain when no id is given.
+   *
    * @param string|null $id
    *
-   * @return ?DomainInterface<T>
+   * @return DomainInterface<T>|null
    */
   public function getDomainById(?string $id = null): ?DomainInterface
   {
-    $id = $id && array_key_exists($id, $this->domainsIdByKeyname) ? $this->domainsIdByKeyname[$id] : $id;
-    if ($id)
+    $this->load();
+    if (null === $id || '' === $id)
     {
-      return array_key_exists($id, $this->domainsById) ? $this->domainsById[$id] : null;
+      return $this->getCurrentDomain();
     }
+    $id = $this->domainsIdByKeyname[$id] ?? $id;
 
-    return $this->currentDomain;
+    return $this->domainsById[$id] ?? null;
+  }
+
+  /**
+   * Domain by id or keyname, falling back to the master domain when it does not exist.
+   *
+   * @param string|null $id
+   *
+   * @return DomainInterface<T>|null
+   */
+  public function getDomainByIdOrMaster(?string $id = null): ?DomainInterface
+  {
+    return $this->getDomainById($id) ?? $this->getDomainMaster();
   }
 
   /**
    * @param string|null $keyname
    *
-   * @return ?DomainInterface<T>
+   * @return DomainInterface<T>|null
    */
   public function getDomainByKeyname(?string $keyname = null): ?DomainInterface
   {
-    return $this->getDomainById($this->getDomainIdByKeyname($keyname));
+    $id = $this->getDomainIdByKeyname($keyname);
+
+    return null !== $id ? $this->getDomainById($id) : null;
   }
 
   /**
    * @param string|null $keyname
    *
-   * @return ?string
+   * @return string|null
    */
   public function getDomainIdByKeyname(?string $keyname = null): ?string
   {
-    return $keyname && array_key_exists($keyname, $this->domainsIdByKeyname) ? $this->domainsIdByKeyname[$keyname] : null;
+    $this->load();
+
+    return null !== $keyname ? ($this->domainsIdByKeyname[$keyname] ?? null) : null;
   }
 
   /**
@@ -347,10 +352,14 @@ class DomainsManagement
   }
 
   /**
+   * Id of the domain used to filter the entities; the master domain unless setFilterDomainId() was called.
+   *
    * @return string|null
    */
   public function getFilterDomainId(): ?string
   {
+    $this->load();
+
     return $this->filterDomainId;
   }
 
@@ -362,32 +371,22 @@ class DomainsManagement
   public function setFilterDomainId(?string $filterDomainId): self
   {
     $this->filterDomainId = $filterDomainId;
+    $this->filterDomainIdDefined = true;
 
     return $this;
   }
 
   /**
-   * @return ?DomainInterface<T>
+   * @return DomainInterface<T>|null
    */
   public function getFilterDomain(): ?DomainInterface
   {
-    return $this->getDomainById($this->filterDomainId);
+    return $this->getDomainById($this->getFilterDomainId());
   }
 
   /**
-   * @var array<int, FilterByDomainInterface<T>>
-   */
-  protected array $objectsDomainAttachement = [];
-
-  /**
-   * @return array<int, FilterByDomainInterface<T>>
-   */
-  public function getObjectsDomainAttachement(): array
-  {
-    return $this->objectsDomainAttachement;
-  }
-
-  /**
+   * Request context of a domain (scheme and host of the domain), built from the current request.
+   *
    * @param string $domainId
    * @param bool   $withoutVirtual
    *
@@ -395,80 +394,150 @@ class DomainsManagement
    */
   public function getRequestContextByDomainId(string $domainId, bool $withoutVirtual = true): ?RequestContext
   {
-    return AustralTools::valueByKey($this->requestContextByDomainId, $this->getReelDomainId($domainId, $withoutVirtual) ?? '');
-  }
-
-  /**
-   * @param EntityInterface<T> $object
-   * @param string|null        $domainId
-   *
-   * @return bool
-   */
-  public function objectAttachementByDomainId(EntityInterface $object, ?string $domainId = null): bool
-  {
-    if ($object instanceof FilterByDomainInterface)
+    $id = $this->resolveDomainId($domainId, $withoutVirtual);
+    if (null === $id || !array_key_exists($id, $this->requestContextDomainIds))
     {
-      /** @var DomainFilterMapping<T>|null $domainFilterMapping */
-      $domainFilterMapping = $this->mapping->getEntityClassMapping($object->getClassnameForMapping(), DomainFilterMapping::class);
-      if ($domainFilterMapping)
-      {
-        if ($domainFilterMapping->getAutoDomainId())
-        {
-          return $object->getDomainId() === $this->getReelDomainId($domainId);
-        }
-      }
+      return null;
+    }
+    $domain = $this->domainsById[$id];
+
+    $requestContext = new RequestContext();
+    if ($request = $this->requestStack->getCurrentRequest())
+    {
+      $requestContext->fromRequest($request);
     }
 
-    return false;
+    return $requestContext->setScheme($domain->getScheme())->setHost($domain->getDomain());
   }
 
   /**
-   * @param EntityInterface<T> $object
-   * @param bool               $withChild
+   * Reloads the domains after a change (and stores them again in the result cache). Keeps the filter domain
+   * set by setFilterDomainId(), and detects the current domain again from the request when it was already
+   * detected (a domain set by setCurrentDomain() is not kept).
    *
    * @return $this
    */
-  public function objectDomainAttachement(EntityInterface $object, bool $withChild = true): self
+  public function refresh(): self
   {
-    if ($object instanceof TranslateChildInterface)
-    {
-      $object = $object->getMaster();
-    }
+    $filterDomainId = $this->filterDomainId;
+    $filterDomainIdDefined = $this->filterDomainIdDefined;
+    $currentDomainResolved = $this->currentDomainResolved;
 
-    if ($object instanceof FilterByDomainInterface)
+    $this->reset();
+    if ($filterDomainIdDefined)
     {
-      /** @var DomainFilterMapping<T>|null $domainFilterMapping */
-      $domainFilterMapping = $this->mapping->getEntityClassMapping($object->getClassnameForMapping(), DomainFilterMapping::class);
-      if ($domainFilterMapping)
-      {
-        if ($domainFilterMapping->getAutoDomainId() && $domainFilterMapping->getAutoAttachement() && $this->getFilterDomainId())
-        {
-          if (!$object->getDomainId())
-          {
-            $object->setDomainId($this->getFilterDomainId());
-          }
-        }
-        if ($withChild)
-        {
-          if (method_exists($object, 'getChildren'))
-          {
-            foreach ($object->getChildren() as $child)
-            {
-              $this->objectDomainAttachement($child);
-            }
-          }
-          if (method_exists($object, 'getChildrenEntities'))
-          {
-            foreach ($object->getChildrenEntities() as $child)
-            {
-              $this->objectDomainAttachement($child);
-            }
-          }
-        }
-        $this->objectsDomainAttachement[] = $object;
-      }
+      $this->setFilterDomainId($filterDomainId);
+    }
+    $this->load();
+    if ($currentDomainResolved)
+    {
+      $this->resolveCurrentDomain();
     }
 
     return $this;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function reset(): void
+  {
+    $this->loaded = false;
+    $this->domains = [];
+    $this->domainsById = [];
+    $this->domainsIdByKeyname = [];
+    $this->domainsWithoutVirtual = [];
+    $this->domainsMaster = [];
+    $this->requestContextDomainIds = [];
+    $this->domainMaster = null;
+    $this->virtualDomainMaster = false;
+    $this->currentDomainResolved = false;
+    $this->currentDomain = null;
+    $this->currentDomainWithVirtual = null;
+    $this->filterDomainId = null;
+    $this->filterDomainIdDefined = false;
+  }
+
+  /**
+   * Loads the enabled domains, once.
+   */
+  protected function load(): void
+  {
+    if ($this->loaded)
+    {
+      return;
+    }
+    $this->loaded = true;
+    $this->debug->stopWatchStart('austral.domain_management.load', 'austral.domain.management');
+
+    $this->createVirtualDomain(self::DOMAIN_ID_FOR_ALL_DOMAINS);
+    $this->domains = $this->domainEntityManager->selectAllEnabledDomains($this->resultCache);
+    foreach ($this->domains as $domain)
+    {
+      $this->domainsById[$domain->getId()] = $domain;
+      if (!$this->domainMaster && $domain->getIsMaster())
+      {
+        $this->domainMaster = $domain;
+        $this->domainsIdByKeyname[self::DOMAIN_ID_MASTER] = $domain->getId();
+      }
+      if (!$domain->getIsRedirect())
+      {
+        if (!$domain->getIsVirtual())
+        {
+          $this->domainsWithoutVirtual[$domain->getId()] = $domain;
+          if ($domain->getIsMaster())
+          {
+            $this->domainsMaster[$domain->getId()] = $domain;
+          }
+        }
+        if (null !== $domain->getKeyname())
+        {
+          $this->domainsIdByKeyname[$domain->getKeyname()] = $domain->getId();
+        }
+        $this->requestContextDomainIds[$domain->getId()] = true;
+      }
+    }
+
+    if (!$this->domainMaster)
+    {
+      $domainMaster = $this->createVirtualDomain(self::DOMAIN_ID_MASTER);
+      $domainMaster->setIsMaster(true);
+      $this->domainMaster = $domainMaster;
+      $this->domainsWithoutVirtual[$domainMaster->getId()] = $domainMaster;
+      $this->virtualDomainMaster = true;
+    }
+    if (!$this->filterDomainIdDefined)
+    {
+      $this->filterDomainId = $this->domainMaster->getId();
+    }
+    $this->applyRequestLanguage($this->httpRequest->getLanguage());
+
+    $this->debug->stopWatchStop('austral.domain_management.load');
+  }
+
+  /**
+   * @param string $keyname
+   *
+   * @return DomainInterface<T>
+   */
+  protected function createVirtualDomain(string $keyname): DomainInterface
+  {
+    $domainClass = $this->domainEntityManager->getClass();
+    if (null === $domainClass || !is_a($domainClass, DomainInterface::class, true))
+    {
+      throw new \LogicException(sprintf('The domain class "%s" must implement "%s" (parameter "austral.entity.domain.class").', $domainClass ?? 'null', DomainInterface::class));
+    }
+
+    /** @var DomainInterface<T> $domain */
+    $domain = new $domainClass();
+    $domain->setId($keyname);
+    $domain->setName($keyname);
+    $domain->setKeyname($keyname);
+    $domain->setDomain($this->requestStack->getMainRequest()?->getHost() ?? '');
+    $domain->setIsVirtual(true);
+    $this->domainsById[$keyname] = $domain;
+    $this->domainsIdByKeyname[$keyname] = $keyname;
+
+    return $domain;
   }
 }

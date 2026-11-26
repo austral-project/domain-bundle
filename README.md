@@ -23,6 +23,10 @@ Multi-domain management for Austral: the domains of the site, the domain of the 
 composer require austral/domain-bundle
 ```
 
+With the [Austral recipes](https://github.com/austral-project/recipes), Flex registers the bundle, copies
+`config/packages/austral_domain.yaml` and the entity `src/Entity/Austral/DomainBundle/Domain.php`, then displays the
+next steps (database schema, `austral:domain:migrate`).
+
 If you do not use Symfony Flex, register the bundle and cache-bundle in `config/bundles.php`:
 
 ```php
@@ -33,7 +37,7 @@ return [
 ];
 ```
 
-Create the domain entity of the application from the skeleton `src/Skeleton/Entity/Domain.php` (`App\Entity\Austral\DomainBundle\Domain`, table `austral_http_domain`), then update the database schema.
+Without Flex, create the domain entity of the application from the skeleton `src/Skeleton/Entity/Domain.php` (`App\Entity\Austral\DomainBundle\Domain`, table `austral_http_domain`), then update the database schema.
 
 ## Configuration
 

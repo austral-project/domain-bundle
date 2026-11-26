@@ -1,26 +1,32 @@
+# Services of the bridge with admin-bundle, loaded only when AustralAdminBundle is enabled (AustralDomainExtension).
 services:
 
-  ##### Listener
-  Austral\DomainBundle\Bridge\Admin\Listener\DashboardListener:
+  Austral\DomainBundle\Bridge\Admin\DomainAdmin:
     arguments:
-      $domainsManagement: '@austral.domain.management'
+      $authorizationChecker:  '@security.authorization_checker'
+      $httpConfiguration:     '@austral.http.config'
     tags:
-      - { name: kernel.event_listener, event: "austral.event.admin.dashboard", method: dashboard }
+      - { name: austral.admin }
 
+  ##### Variants: a list by domain for the entities filtered by domain
+  Austral\DomainBundle\Bridge\Admin\DomainVariantProvider:
+    arguments:
+      $domainsManagement:     '@Austral\DomainBundle\Services\DomainsManagement'
+      $translator:            '@translator'
+      $fileLinkGenerator:     '@austral.entity_file.link.generator'
+    tags:
+      - { name: austral.admin.module_variants, priority: 100 }
 
-parameters:
-  austral.admin.class.domain.class:                     Austral\DomainBundle\Bridge\Admin\Admin\DomainAdmin
-  austral.admin.modules.domain_bundle.domain.enabled:   true
+  ##### Listeners
+  Austral\DomainBundle\Bridge\Admin\AdminDomainListener:
+    arguments:
+      $domainsManagement:     '@Austral\DomainBundle\Services\DomainsManagement'
+    tags:
+      # After HttpAdminEventSubscriber::onRequest() (priority 1024), which resolves the module
+      - { name: kernel.event_listener, event: austral.event.http.request, method: onRequest, priority: 1023 }
 
-  austral_admin.modules.domain_bundle:
-    domain:
-      enabled:                    "%austral.admin.modules.domain_bundle.domain.enabled%"
-      navigation:
-        position:                 100
-      name:                       "Domain"
-      picto:                      "austral-picto-globe"
-      route:                      "domain"
-      class:                      "%austral.admin.class.domain.class%"
-      translate:                  "male_c"
-      sortable:                   true
-      entity_manager:             "austral.entity_manager.domain"
+  Austral\DomainBundle\Bridge\Admin\DashboardListener:
+    arguments:
+      $domainsManagement:     '@Austral\DomainBundle\Services\DomainsManagement'
+    tags:
+      - { name: kernel.event_listener, event: austral.admin.dashboard, method: dashboard }

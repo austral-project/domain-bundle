@@ -113,7 +113,19 @@ Attaches the existing entities filtered by domain (`autoDomainId`) to the master
 
 ## Administration
 
-When [austral/admin-bundle](https://github.com/austral-project/admin-bundle) is installed, the bundle adds the administration screen of the domains and a block on the dashboard.
+When [austral/admin-bundle](https://github.com/austral-project/admin-bundle) 4 is installed, the bridge `src/Bridge/Admin/` adds:
+
+- the module `domain` (`/austral-admin/domain`, roles `ROLE_DOMAIN`, `ROLE_DOMAIN_EDIT`...): the domains, their logos and their configuration. A user who is not root sees and edits the master domains only, and does not see the key of a domain;
+- a list by domain for the entity modules whose entity has `#[DomainFilter(autoDomainId: true)]`: `/austral-admin/pages` shows a tile by domain, `/austral-admin/pages/{domain}` its entities, and an entity created there belongs to it. The domains are those without the virtual ones and the redirections; "All the domains" is added when there are several domains and the entity has `forAllDomainEnabled`. The segment of the URL is the key of the domain, or its id when the key cannot be a segment. With one domain, the choice is skipped. In the list of a domain, this domain is the filter domain of the request (`DomainsManagement::getFilterDomainId()`), as in the 3.1;
+- the number of domains on the dashboard, on a site with several master domains.
+
+The application changes or disables the module in `config/packages/austral_admin.yaml`:
+
+```yaml
+austral_admin:
+  modules:
+    domain: { enabled: false }
+```
 
 ## Documentation
 

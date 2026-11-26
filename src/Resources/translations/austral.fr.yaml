@@ -1,59 +1,46 @@
-pages:
-  names:
-    domain:
-      singular:                                                       Domaine
-      plural:                                                         Domaines
+# Traductions de domain-bundle (domaine austral), clés à plat. Le module et le bloc du tableau de bord sont ceux du
+# bridge avec admin-bundle.
+'pages.names.domain.singular': Domaine
+'pages.names.domain.plural': Domaines
 
+'domains.forAll': Tous les domaines
 
+'fieldset.dev.config': Configuration développeur
+'fieldset.domainLogo': Logos pour le domaine
+'fieldset.domainConfig': Configuration du domaine
 
-fieldset:
-  domainLogo:                                                         Logos pour le domaine
-  domainConfig:                                                       Configuration du domaine
+'groups.robots': Moteurs de recherche
+'groups.redirect': Redirections
 
-groups:
-  redirect:                                                           Redirections
+'choices.status.no': Non
+'choices.status.yes': Oui
 
-fields:
-  domain:
-    entitled:                                                         Domaine
-  isMaster:
-    entitled:                                                         Est le domaine principal ?
-    information:                                                      Possède l'ensemble des pages du site.
-  domainMaster:
-    entitled:                                                         Domaine principal
-  onePage:
-    entitled:                                                         N'a qu'une seule page ?
-    information:                                                      Ne possède qu'une seule page.
-  scheme:
-    entitled:                                                         Scheme
-  redirectUrl:
-    entitled:                                                         Url de redirection du domaine
-  isVirtual:
-    entitled:                                                         Est virtuel ?
-    information:                                                      Si défini, le domaine principal devra être choisi.
-  favicon:
-    entitled:                                                         Favicon
-  logo:
-    entitled:                                                         Logo
-  nameDomain:
-    entitled:                                                         Nom
-  redirectWithUri:
-    entitled:                                                         Conserver l'url pour la redirection ?
-  domainEnv:
-    entitled:                                                         Env
-  isTranslate:
-    entitled:                                                         Domaine traduit
-  logoSecond:
-    entitled:                                                         Logo secondaire
-  logoEmail:
-    entitled:                                                         Logo email
-  isIndexDomain:
-    information:                                                      Activer l'indexation afin d'accepter les moteurs de recherche à naviguer sur le domaine ?
-  isFollowDomain:
-    information:                                                      Activer le suivi des moteurs de recherche pour le domaine?
-  seoTitleSuffixHomepage:
-    entitled:                                                         Suffix du titre de la page pour la homepage
-    information:                                                      "exemple : - Mon site"
-  seoTitleSuffix:
-    entitled:                                                         Suffix du titre de la page pour l'ensemble des pages
-    information:                                                      "exemple : - Mon site"
+'fields.nameDomain.entitled': Nom
+'fields.domain.entitled': Domaine
+'fields.domainEnv.entitled': Env
+'fields.scheme.entitled': Scheme
+'fields.isEnabled.entitled': Activé
+'fields.isMaster.entitled': Est le domaine principal ?
+'fields.isMaster.information': Possède l'ensemble des pages du site.
+'fields.onePage.entitled': N'a qu'une seule page ?
+'fields.onePage.information': Ne possède qu'une seule page.
+'fields.isVirtual.entitled': Est virtuel ?
+'fields.isVirtual.information': Si défini, le domaine principal devra être choisi.
+'fields.isTranslate.entitled': Domaine traduit
+'fields.isTranslate.information': Le domaine est une langue de son domaine principal.
+'fields.domainMaster.entitled': Domaine principal
+'fields.redirectUrl.entitled': Url de redirection du domaine
+'fields.redirectWithUri.entitled': Conserver l'url pour la redirection ?
+'fields.favicon.entitled': Favicon
+'fields.logo.entitled': Logo
+'fields.logoSecond.entitled': Logo secondaire
+'fields.logoEmail.entitled': Logo email
+'fields.isIndex.entitled': Indexé
+'fields.isIndexDomain.information': Activer l'indexation afin d'accepter les moteurs de recherche à naviguer sur le domaine ?
+'fields.isFollow.entitled': Suivi
+'fields.isFollowDomain.information': Activer le suivi des moteurs de recherche pour le domaine ?
+'fields.seoTitleSuffixHomepage.entitled': Suffixe du titre de la page pour la homepage
+'fields.seoTitleSuffixHomepage.information': 'Exemple : - Mon site'
+'fields.seoTitleSuffix.entitled': Suffixe du titre de la page pour l'ensemble des pages
+'fields.seoTitleSuffix.information': 'Exemple : - Mon site'
+'fields.updated.entitled': Mis à jour

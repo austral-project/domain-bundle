@@ -15,6 +15,8 @@
 
 All `austral/*` packages must be upgraded to `^4.0` at the same time. In 3.x, the domains were managed by http-bundle.
 
+domain-bundle does not require `doctrine/doctrine-migrations-bundle`: a project that runs migrations requires it itself, in the version it chooses (`symfony/orm-pack` installs the 4.x).
+
 Register the bundle, and cache-bundle on which it depends, in `config/bundles.php`:
 
 ```php
@@ -102,3 +104,17 @@ When the cache of HTML renders of cache-bundle is used, the current domain is pa
 ### Configuration
 
 The XML namespace of the bundle configuration is `https://austral.dev/schema/dic/austral_domain`.
+
+### Administration (admin-bundle 4)
+
+The bridge is written for admin-bundle 4:
+
+| 3.1 | 4.0 |
+|-----|-----|
+| parameter `austral.admin.modules.http_bundle.domain.enabled: false` | `austral_admin: { modules: { domain: { enabled: false } } }` |
+| parameter `austral.admin.class.domain.class` (Admin of the application) | `austral_admin: { modules: { domain: { class: App\Admin\DomainAdmin } } }` |
+| `Austral\HttpBundle\Admin\DomainAdmin` | `Austral\DomainBundle\Bridge\Admin\DomainAdmin` |
+| `Austral\HttpBundle\Listener\DashboardListener` (service `austral.http.dashboard.listener`) | `Austral\DomainBundle\Bridge\Admin\DashboardListener` |
+| a module cloned by domain, `/pages/www.example.com` | a variant of the module, `/pages/{key of the domain}` (its id when the key cannot be a segment of a URL) |
+
+The route of the module (`/austral-admin/domain`) and its roles (`ROLE_DOMAIN`, `ROLE_DOMAIN_EDIT`...) do not change. The bookmarks of the lists by domain must be updated: the segment is the key of the domain, no longer its host. A user who is not root can no longer open a domain that is not a master domain.

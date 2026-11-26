@@ -7,7 +7,4 @@ parameters:
   paths:
     - src
     - tests
-  excludePaths:
-      analyse:
-        - src/Bridge
   tmpDir: var/phpstan

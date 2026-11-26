@@ -11,12 +11,14 @@
 
 namespace Austral\DomainBundle\DependencyInjection;
 
+use Austral\AdminBundle\DependencyInjection\AdminModulesPrepender;
 use Austral\CacheBundle\Cache\ResultCache;
 use Austral\DomainBundle\Entity\Interfaces\DomainInterface;
 use Austral\DomainBundle\Services\DomainsManagement;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Extension\Extension;
+use Symfony\Component\DependencyInjection\Extension\PrependExtensionInterface;
 use Symfony\Component\DependencyInjection\Loader\YamlFileLoader;
 use Symfony\Component\DependencyInjection\Reference;
 
@@ -27,8 +29,23 @@ use Symfony\Component\DependencyInjection\Reference;
  *
  * @final
  */
-class AustralDomainExtension extends Extension
+class AustralDomainExtension extends Extension implements PrependExtensionInterface
 {
+  /**
+   * Bridge: the module of the domains in admin-bundle, when it is enabled.
+   *
+   * @param ContainerBuilder $container
+   *
+   * @return void
+   */
+  public function prepend(ContainerBuilder $container): void
+  {
+    if (class_exists(AdminModulesPrepender::class))
+    {
+      AdminModulesPrepender::prepend($container, __DIR__.'/../Bridge/Admin/austral_admin.yaml');
+    }
+  }
+
   /**
    * {@inheritdoc}
    *

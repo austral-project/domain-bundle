@@ -16,7 +16,7 @@ First version of `austral/domain-bundle`: the domain management of http-bundle 3
   - `DomainsManagement`, `DomainEntityManager` and `DomainRepository`;
   - entity mapping and entity manager listeners;
   - `austral:domain:migrate` command;
-  - administration screen and dashboard block in `src/Bridge/Admin/`, loaded only when admin-bundle is installed.
+  - bridge with admin-bundle 4 in `src/Bridge/Admin/`, loaded only when admin-bundle is installed: module `domain` (`DomainAdmin`), dashboard block, `DomainVariantProvider`, a list by domain for the entities filtered by domain, and `AdminDomainListener`, which makes the domain of the list the filter domain of the request.
 - Cache of the enabled domains in the Doctrine result cache of cache-bundle (key `austral_domain.enabled_domains`), deleted when a domain is saved. Option `austral_domain.cache` (`true` by default; also needs `austral_cache.enabled`).
 - `Listener\CacheListener`: reloads the domains, and so rebuilds their cache, after a flush that changed a domain (`austral.cache.invalidated`) and on `austral.cache.rebuild` (`austral:cache:rebuild --result`).
 - `Cache\DomainCacheContext`: the current domain is part of the key of the HTML renders of cache-bundle.
@@ -44,6 +44,13 @@ First version of `austral/domain-bundle`: the domain management of http-bundle 3
 - `Domain::getName()` returns a string, empty when the domain has no name; `__toString()` and `getUrlParameterStatusName()` then return the host.
 - The XML namespace of the bundle configuration is `https://austral.dev/schema/dic/austral_domain`.
 - The admin bridge is loaded from the registered bundles, not from `config/bundles.php` of the application.
+- **BREAKING** The admin bridge is written for admin-bundle 4:
+  - the module is added by `prepend()` (`AdminModulesPrepender`); the parameters `austral_admin.modules.http_bundle`, `austral.admin.class.domain.class` and `austral.admin.modules.http_bundle.domain.enabled` of http-bundle 3.1 are not kept;
+  - `DomainAdmin` and `DashboardListener` are in the `Austral\DomainBundle\Bridge\Admin` namespace (`Austral\HttpBundle\Admin\` and `Austral\HttpBundle\Listener\` in 3.1);
+  - the modules cloned by domain of admin-bundle 3.1 are replaced by the variants of `DomainVariantProvider`: the URLs end with the key of the domain (`/pages/main/...`) instead of the domain;
+  - the list of the domains shows the master domains only to a user who is not root, also for edit, toggle and export (the list only in 3.1).
+
+- `doctrine/doctrine-migrations-bundle` is not required: the bundle does not use it, and `^3.0` prevented the installation in a project with DoctrineMigrationsBundle 4 (installed by `symfony/orm-pack`).
 
 ### Fixed
 

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Austral\DomainBundle\Tests\DependencyInjection;
 
+use Austral\AdminBundle\DependencyInjection\AustralAdminExtension;
 use Austral\CacheBundle\AustralCacheBundle;
 use Austral\CacheBundle\Cache\ResultCache;
 use Austral\CacheBundle\DependencyInjection\AustralCacheExtension;
@@ -20,7 +21,10 @@ use Austral\CacheBundle\Event\CacheInvalidatedEvent;
 use Austral\CacheBundle\Event\CacheRebuildEvent;
 use Austral\CacheBundle\Listener\EntityCacheListener;
 use Austral\DomainBundle\AustralDomainBundle;
-use Austral\DomainBundle\Bridge\Admin\Listener\DashboardListener;
+use Austral\DomainBundle\Bridge\Admin\AdminDomainListener;
+use Austral\DomainBundle\Bridge\Admin\DashboardListener;
+use Austral\DomainBundle\Bridge\Admin\DomainAdmin;
+use Austral\DomainBundle\Bridge\Admin\DomainVariantProvider;
 use Austral\DomainBundle\Cache\DomainCacheContext;
 use Austral\DomainBundle\Command\DomainAttachementMigrateCommand;
 use Austral\DomainBundle\DependencyInjection\AustralDomainExtension;
@@ -38,6 +42,7 @@ use Austral\EntityBundle\EntityManager\EntityManager;
 use Austral\EntityBundle\Event\EntityManagerEvent;
 use Austral\EntityBundle\Event\EntityMappingEvent;
 use Austral\EntityBundle\Mapping\Mapping;
+use Austral\EntityFileBundle\File\Link\Generator;
 use Austral\HttpBundle\Configuration\HttpConfiguration;
 use Austral\HttpBundle\Services\HttpRequest;
 use Austral\ToolsBundle\Services\Debug;
@@ -51,7 +56,9 @@ use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
  * The services are defined explicitly: a missing or misnamed argument only shows up when the container
@@ -64,6 +71,15 @@ final class ContainerTest extends TestCase
   private const string ADMIN_BUNDLE = 'Austral\\AdminBundle\\AustralAdminBundle';
 
   private const string RESOLVE_TARGET_ENTITY = 'doctrine.orm.listeners.resolve_target_entity';
+
+  /**
+   * Services of the other bundles used by the bridge of admin-bundle, set after the compilation.
+   */
+  private const array ADMIN_SERVICES = [
+    'security.authorization_checker' => AuthorizationCheckerInterface::class,
+    'translator' => TranslatorInterface::class,
+    'austral.entity_file.link.generator' => Generator::class,
+  ];
 
   /**
    * Public aliases: the supported way to get a service from the container.
@@ -123,12 +139,32 @@ final class ContainerTest extends TestCase
     $withAdmin = self::loadExtension(withAdmin: true);
 
     self::assertFalse($withoutAdmin->hasDefinition(DashboardListener::class));
-    self::assertFalse($withoutAdmin->hasParameter('austral_admin.modules.domain_bundle'));
-    self::assertTrue($withAdmin->hasParameter('austral_admin.modules.domain_bundle'));
+    self::assertTrue($withAdmin->getDefinition(DomainAdmin::class)->hasTag('austral.admin'));
+    self::assertSame([['priority' => 100]], $withAdmin->getDefinition(DomainVariantProvider::class)->getTag('austral.admin.module_variants'));
     self::assertSame(
-      [['event' => 'austral.event.admin.dashboard', 'method' => 'dashboard']],
+      [['event' => 'austral.admin.dashboard', 'method' => 'dashboard']],
       $withAdmin->getDefinition(DashboardListener::class)->getTag('kernel.event_listener')
     );
+    self::assertSame(
+      [['event' => 'austral.event.http.request', 'method' => 'onRequest', 'priority' => AdminDomainListener::PRIORITY]],
+      $withAdmin->getDefinition(AdminDomainListener::class)->getTag('kernel.event_listener')
+    );
+  }
+
+  public function testTheModuleOfTheDomainsIsAddedToTheAdmin(): void
+  {
+    $container = new ContainerBuilder();
+    new AustralDomainExtension()->prepend($container);
+    self::assertSame([], $container->getExtensionConfig('austral_admin'), 'Without admin-bundle: nothing.');
+
+    $container->registerExtension(new AustralAdminExtension());
+    new AustralDomainExtension()->prepend($container);
+    $module = $container->getExtensionConfig('austral_admin')[0]['modules']['domain'] ?? null;
+
+    self::assertIsArray($module);
+    self::assertSame(DomainAdmin::class, $module['class']);
+    self::assertSame('austral.entity_manager.domain', $module['entity_manager']);
+    self::assertSame('domain', $module['route']);
   }
 
   public function testOnlyTheDocumentedAliasesArePublic(): void
@@ -311,6 +347,9 @@ final class ContainerTest extends TestCase
     ];
     if ($withAdmin)
     {
+      $services[] = DomainAdmin::class;
+      $services[] = DomainVariantProvider::class;
+      $services[] = AdminDomainListener::class;
       $services[] = DashboardListener::class;
     }
 
@@ -341,6 +380,15 @@ final class ContainerTest extends TestCase
     foreach (['austral.entity.mapping' => Mapping::class, 'austral.entity_manager' => EntityManager::class, 'doctrine.orm.entity_manager' => EntityManagerInterface::class] as $id => $class)
     {
       $container->setDefinition($id, new Definition($class)->setSynthetic(true)->setPublic(true));
+    }
+    if ($withAdmin)
+    {
+      // Services of the application and of the other bundles used by the bridge
+      $container->setDefinition('austral.http.config', new Definition(HttpConfiguration::class));
+      foreach (self::ADMIN_SERVICES as $id => $class)
+      {
+        $container->setDefinition($id, new Definition($class)->setSynthetic(true)->setPublic(true));
+      }
     }
     // Public: kept after the compilation, to read what the compiler pass of the bundle added
     $container->setDefinition(self::RESOLVE_TARGET_ENTITY, new Definition(ResolveTargetEntityListener::class)->setPublic(true));
@@ -376,6 +424,12 @@ final class ContainerTest extends TestCase
     $container->set('austral.entity.mapping', new \ReflectionClass(Mapping::class)->newInstanceWithoutConstructor());
     $container->set('austral.entity_manager', $this->createStub(EntityManager::class));
     $container->set('doctrine.orm.entity_manager', $this->createStub(EntityManagerInterface::class));
+    if ($withAdmin)
+    {
+      $container->set('security.authorization_checker', $this->createStub(AuthorizationCheckerInterface::class));
+      $container->set('translator', $this->createStub(TranslatorInterface::class));
+      $container->set('austral.entity_file.link.generator', new \ReflectionClass(Generator::class)->newInstanceWithoutConstructor());
+    }
 
     return $container;
   }

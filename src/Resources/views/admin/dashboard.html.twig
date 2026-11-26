@@ -1,0 +1,12 @@
+{#
+ # This file is part of the Austral Domain Bundle package.
+ #
+ # (c) Austral <support@austral.dev>
+ #
+ # Block "domains" of the dashboard of admin-bundle (DashboardListener). Variable: count.
+ #}
+{%- trans_default_domain 'austral' -%}
+<p class="austral-domain-dashboard-count">
+  <span class="picto austral-picto-globe" aria-hidden="true"></span>
+  <strong>{{ count }}</strong> {{ 'dashboard.tiles.domains.count.entitled'|trans({count: count}) }}
+</p>
